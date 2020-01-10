@@ -105,25 +105,31 @@ class python::install {
       # SCL is only valid in the RedHat family. If RHEL, package must be
       # enabled using the subscription manager outside of puppet. If CentOS,
       # the centos-release-SCL will install the repository.
+
+      # SCL is not supported for RHEL8, moved to modules
       if $python::manage_scl {
-        $install_scl_repo_package = $facts['os']['name'] ? {
-          'CentOS' => 'present',
-          default  => 'absent',
-        }
+        if(versioncmp($facts['os']['release']['major'], '8') >= 0) {
+          fail("SCL is not supported on $facts['os']['name'] $facts['os']['release']['major']")
+        } else {
+          $install_scl_repo_package = $facts['os']['name'] ? {
+            'CentOS' => 'present',
+            default  => 'absent',
+          }
 
-        package { 'centos-release-scl':
-          ensure => $install_scl_repo_package,
-          before => Package['scl-utils'],
-        }
-        package { 'scl-utils':
-          ensure => 'present',
-          before => Package['python'],
-        }
+          package { 'centos-release-scl':
+            ensure => $install_scl_repo_package,
+            before => Package['scl-utils'],
+          }
+          package { 'scl-utils':
+            ensure => 'present',
+            before => Package['python'],
+          }
 
-        Package['scl-utils'] -> Package["${python}-scldevel"]
+          Package['scl-utils'] -> Package["${python}-scldevel"]
 
-        if $pip_ensure != 'absent' {
-          Package['scl-utils'] -> Exec['python-scl-pip-install']
+          if $pip_ensure != 'absent' {
+            Package['scl-utils'] -> Exec['python-scl-pip-install']
+          }
         }
       }
 
@@ -252,7 +258,12 @@ class python::install {
             }
           }
 
-          $virtualenv_package = "${python}-virtualenv"
+          # CentOS 8 uses 'python36' for python packages and 'python3-virtualenv' for virtualenv
+          if ($facts['os']['family'] == 'RedHat') and (versioncmp($facts['os']['release']['major'], '8') >= 0) {
+            $virtualenv_package = "python3-virtualenv"
+          } else {
+            $virtualenv_package = "${python}-virtualenv"
+          }
         }
         'Debian': {
           if fact('lsbdistcodename') == 'trusty' {
@@ -270,9 +281,16 @@ class python::install {
       }
 
       if String($python::version) =~ /^python3/ {
-        $pip_category = undef
-        $pip_package = "${python}-pip"
-        $pip_provider = $python.regsubst(/^.*python3\.?/,'pip3.').regsubst(/\.$/,'')
+        # CentOS 8 uses 'python36' for python packages and 'python3-pip' for pip
+        if ($facts['os']['family'] == 'RedHat') and (versioncmp($facts['os']['release']['major'], '8') >= 0) {
+          $pip_category = undef
+          $pip_package = 'python3-pip'
+          $pip_provider = pip3
+        } else {
+          $pip_category = undef
+          $pip_package = "${python}-pip"
+          $pip_provider = $python.regsubst(/^.*python3\.?/,'pip3.').regsubst(/\.$/,'')
+        }
       } elsif ($facts['os']['family'] == 'RedHat') and (versioncmp($facts['os']['release']['major'], '7') >= 0) {
         $pip_category = undef
         $pip_package = 'python2-pip'

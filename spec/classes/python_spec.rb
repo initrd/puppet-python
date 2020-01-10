@@ -391,6 +391,25 @@ describe 'python', type: :class do
                 end
               end
             end
+
+          when '8'
+
+            context 'on a Redhat 8 OS' do
+              it { is_expected.to contain_class('python::install') }
+              it { is_expected.to contain_package('pip').with_name('python3-pip') }
+
+              describe 'with python::version' do
+                context 'python36' do
+                  let(:params) { { version: 'python36' } }
+
+                  it { is_expected.to compile.with_all_deps }
+                  it { is_expected.to contain_package('pip').with_name('python3-pip') }
+                  it { is_expected.to contain_package('python').with_name('python36') }
+                  it { is_expected.to contain_package('python-dev').with_name('python36-devel') }
+                  it { is_expected.to contain_package('virtualenv').with_name('python3-virtualenv') }
+                end
+              end
+            end
           end
         end
       when 'Suse'
